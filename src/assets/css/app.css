@@ -1,0 +1,57 @@
+@font-face {
+    font-family: nunito;
+    font-style: normal;
+    font-weight: 900;
+    src: url('../fonts/nunito/nunito_light.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: nunito;
+    font-style: normal;
+    font-weight: bold;
+    src: url('../fonts/nunito/nunito_bold.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: nunito;
+    font-style: normal;
+    font-weight: 500;
+    src: url('../fonts/nunito/nunito_regular.ttf') format('truetype');
+}
+
+/* 4px scroll thumb. 10px margin from right margin */
+::-webkit-scrollbar-track {
+    box-shadow: inset 0 0 14px 14px transparent;
+    border: solid 4px transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    box-shadow: inset 0 0 14px 14px #333333;
+    border: solid 4px transparent;
+    border-radius: 14px;
+}
+
+::-webkit-scrollbar-button {
+    display: none;
+}
+
+::-webkit-scrollbar {
+    width: 14px;
+}
+
+body {
+    font-family: nunito, sans-serif;
+    color: #FFFFFF;
+    background: #1f1f1f;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    scrollbar-color: #333333 #1f1f1f;
+}
+
+.full-width {
+    width: 100%;
+}
