@@ -1,5 +1,6 @@
 <template>
   <div class="container">
+    <notifications group="main" position="top center" />
     <transition name="router-animation"
       enter-active-class="animated fadeIn"
       leave-active-class="animated fadeOut"

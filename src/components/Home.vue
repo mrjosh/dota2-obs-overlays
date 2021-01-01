@@ -1,6 +1,6 @@
 <template>
 
-  <div class="home">
+  <div class="home" v-show="ready">
 
     <div v-if="authenticated">
 
@@ -15,7 +15,7 @@
             :loading="logoutLoading"
             class="save-btn btn btn-primary mt-1 pull-left mt-3"
             :disabled="logoutBtnDisabled">
-          <span>Logout</span>
+          <span>Disconnect</span>
           </VueLoadingButton>
         </div>
       </div>
@@ -28,9 +28,10 @@
           </label>
         </div>
         <ModelSelect 
-                   id="sences"
                    :options="scenes"
                    v-model="selectedScene"
+                   :searchable="true"
+                   @input="onSelectActiveScene"
                    placeholder="select a sence" />
       </div>
 
@@ -47,9 +48,9 @@
             </label>
           </div>
           <ModelSelect 
-                     id="sence-item"
                      :options="sceneItems"
-                     v-model="selectedItem"
+                     v-model="draftCover"
+                     @input="onSelectDraftCover"
                      placeholder="select an item" />
         </div>
 
@@ -61,15 +62,15 @@
             </label>
           </div>
           <ModelSelect 
-                     id="sence-in-game-item"
                      :options="sceneItems"
-                     v-model="selectedInGameItem"
+                     @input="onSelectedMinimap"
+                     v-model="minimapCover"
                      placeholder="select an item" />
         </div>
 
       </div>
 
-      <div v-if="sceneItems.length === 0 && selectedScene.value !== ''">
+      <div v-if="sceneItems.length === 0">
         This scene has no items!
       </div>
 
@@ -90,7 +91,7 @@
           type="text"
           name="ws-port"
           placeholder="Port" 
-          v-model="port"
+          v-model="config.port"
           required />
       </div>
 
@@ -107,7 +108,7 @@
           class="form-control" 
           type="password" 
           placeholder="Password" 
-          v-model="password"
+          v-model="config.password"
           autofocus 
           required />
       </div>
@@ -168,7 +169,18 @@ export default {
   },
   data() {
     return {
-      port: 4444,
+
+      ready: false,
+      config: {
+        port: 4444,
+        password: "",
+        scene: "",
+        covers: {
+          draft: '',
+          minimap: '',
+        }
+      },
+
       loading: false,
       logoutLoading: false,
       authenticated: false,
@@ -177,98 +189,94 @@ export default {
       logoutBtnDisabled: false,
 
       noBtn: false,
-
-      password: null,
       btnName: "Connect",
 
       selectedScene: {
         value: '',
         text: '',
-        items: [],
       },
+      
       scenes: [],
-      selectedItem: {
+      draftCover: {
         value: '',
         text: '',
       },
-      selectedInGameItem: {
+      
+      minimapCover: {
         value: '',
         text: '',
       },
+      
       sceneItems: [],
+    
     }
   },
-  watch: {
-    selectedItem: {
-      deep: true,
-      handler(item) {
-        if (typeof item.value !== 'undefined') {
-          localStorage.setItem("selected_item", item.value)
-        }
-      }
-    },
-    selectedInGameItem: {
-      deep: true,
-      handler(item) {
-        if (typeof item.value !== 'undefined') {
-          localStorage.setItem('selected_ingame_item', item.value)
-        }
-      }
-    },
-    selectedScene: {
-      deep: true,
-      handler(scene) {
-        if (typeof scene.text !== 'undefined') {
-          this.sceneItems = [];
-          localStorage.setItem("selected_scene", scene.text)
-          scene.sources.forEach(source => {
-            this.sceneItems.push({
-              value: source.id,
-              text:  source.name,
-              extra: source,
-            })
-          });
-        }
-      }
-    },
-  },
   methods: {
-
+    
+    onSelectActiveScene() {
+      
+      this.sceneItems = [];
+      this.config.scene = this.selectedScene.text;
+      
+      this.selectedScene.sources.forEach(item => {
+        this.sceneItems.push({
+          value: item.id,
+          text: item.name,
+        });
+      })
+      
+      ipc.send('update_config', this.config)
+      console.log("Scene selected: ", this.selectedScene);
+    },
+    
+    onSelectDraftCover() {
+      let item = this.sceneItems.find(f => f.text === this.draftCover.text);
+      this.config.covers.draft = item.text;
+      ipc.send('update_config', this.config)
+    },
+    
+    onSelectedMinimap() {
+      let item = this.sceneItems.find(f => f.text === this.minimapCover.text);
+      this.config.covers.minimap = item.text;
+      ipc.send('update_config', this.config)
+    },
+    
     onAuthorized() {
-      const selectedSceneId = localStorage.getItem("selected_scene");
-      if (selectedSceneId !== null) {
-        let scene = this.scenes.find(f => f.text === selectedSceneId)
-        if (scene !== undefined) {
-          this.selectedScene = scene
-        }
-      }
-      const selectedItemId = localStorage.getItem("selected_item");
-      if (selectedItemId !== null) {
-        let item = this.selectedScene.sources.find(f => f.id == selectedItemId)
-        if (item !== undefined) {
-          this.selectedItem = {
+      
+      this.$notify({
+        group: 'main',
+        title: 'Authentication',
+        type: 'success',
+        text: 'Authenticated',
+      });
+
+      if (this.config.scene !== null) {
+        let scene = this.scenes.find(f => f.text === this.config.scene);
+        this.selectedScene = scene;
+        scene.sources.forEach(item => {
+          this.sceneItems.push({
             value: item.id,
-            text:  item.name,
-            extra: item,
-          }
-        }
+            text: item.name,
+          });
+        });
       }
-      const selectedInGameItemId = localStorage.getItem("selected_ingame_item");
-      if (selectedInGameItemId !== null) {
-        let item = this.selectedScene.sources.find(f => f.id == selectedInGameItemId)
-        if (item !== undefined) {
-          this.selectedInGameItem = {
-            value: item.id,
-            text:  item.name,
-            extra: item,
-          }
-        }
+
+      if (this.config.covers.minimap !== null) {
+        let item = this.sceneItems.find(f => f.text === this.config.covers.minimap);
+        this.minimapCover = item;
       }
+
+      if (this.config.covers.draft !== null) {
+        let item = this.sceneItems.find(f => f.text === this.config.covers.draft);
+        this.draftCover = item;
+      }
+      
       ipc.send('start-server', { 
-        selectedItem: this.selectedItem,
-        selectedInGameItem: this.selectedInGameItem,
+        draftCover: this.draftCover,
+        minimapCover: this.minimapCover,
         selectedScene: this.selectedScene,
       })
+    
     },
 
     submit() {
@@ -284,35 +292,35 @@ export default {
 
         ipc.on("toggle_drafting_cover", (_, {visible}) => {
           obs.send('SetSceneItemProperties', {
-            'scene-name': this.selectedScene,
-            'item': this.selectedItem.text,
+            'scene-name': this.selectedScene.text,
+            'item': this.draftCover.text,
             'visible': visible, 
           }).then(console.log).catch(console.log)
         })
 
         ipc.on("toggle_minimap_cover", (_, {visible}) => {
           obs.send('SetSceneItemProperties', {
-            'scene-name': this.selectedScene,
-            'item': this.selectedInGameItem.text,
+            'scene-name': this.selectedScene.text,
+            'item': this.minimapCover.text,
             'visible': visible, 
           }).then(console.log).catch(console.log)
         })
 
-
-        obs.connect({ address: `localhost:${this.port}`, password: this.password }).then(() => {
+        // Connecting to OBS
+        obs.connect({ address: `127.0.0.1:${this.config.port}`, password: this.config.password }).then(() => {
+        
           this.btnName = "Connect";
           this.btnDisabled = false;
           this.$refs.tokenInput.disabled = false;
           this.loading = false;
           this.authenticated = true;
-          console.log(`Success! We're connected & authenticated.`);
-          localStorage.setItem('authorized', true)
-          localStorage.setItem('port', this.port);
-          localStorage.setItem('password', this.password);
+          
           return obs.send('GetSceneList');
+        
         }).then(data => {
-          console.log(`${data.scenes.length} Available Scenes!`);
-          console.log(data.scenes)
+          
+          ipc.send('update_config', this.config)
+          
           data.scenes.forEach((scene, id) => {
             this.scenes.push({
               value: id,
@@ -320,15 +328,23 @@ export default {
               sources: scene.sources,
             })
           });
+
           this.onAuthorized();
+
         }).catch(err => {
+
           if (err.status === "error") {
             if(err.code === "CONNECTION_ERROR") {
               this.btnName = "Connect"
               this.btnDisabled = false;
               this.$refs.tokenInput.disabled = false;
               this.loading = false;
-              console.log("Connection Error!")
+              this.$notify({
+                group: 'main',
+                title: 'Authentication',
+                type: 'error',
+                text: 'Connection error, Make sure you have OBS opened!',
+              });
             }
             switch(err.error) {
               case "Authentication Failed.":
@@ -336,7 +352,12 @@ export default {
                 this.btnDisabled = false;
                 this.$refs.tokenInput.disabled = false;
                 this.loading = false;
-                console.log("Authentication failed!")
+                this.$notify({
+                  group: 'main',
+                  title: 'Authentication',
+                  type: 'error',
+                  text: 'Password is incorrect!',
+                });
                 console.log(err);
                 break;
             }
@@ -347,61 +368,35 @@ export default {
           console.error('Socket err', err);
         });
 
-        //this.connectToStreamLabsObs().then(() => {
-        //  this.btnName = "Connected! Gathering resources..."
-        //  setTimeout(() => {
-        //    this.loading = false
-        //    this.authenticated = true
-        //    this.noBtn = true
-        //    localStorage.setItem("authorized", this.auth_token)
-        //    this.onAuthorized()
-        //  }, 2000);
-        //}).catch(err => {
-        //  switch (err.code) {
-        //    case -32603:
-        //      this.btnName = "Unauthorized!"
-        //      setTimeout(() => {
-        //        this.auth_token = null
-        //        this.loading = false
-        //        this.btnDisabled = false
-        //        this.$refs.tokenInput.disabled = false
-        //        this.btnName = "Connect"
-        //      }, 2000);
-        //      break;
-        //    default:
-        //      console.log("Could not connect!");
-        //      break;
-        //  }
-        //});
       }
     },
     logout() {
-      localStorage.removeItem("authorized")
-      localStorage.removeItem("selected_item")
-      localStorage.removeItem("selected_scene")
-      localStorage.removeItem("selected_ingame_item")
-      localStorage.removeItem("password")
-      localStorage.removeItem("port")
       this.authenticated = false;
-      this.selectedItem = {};
-      this.selectedInGameItem = {};
-      this.password = "";
-      this.port = 4444;
+      this.draftCover = {};
+      this.minimapCover = {};
       this.loading = false;
     }
   },
   mounted() {
-    this.loading = true;
-    const authenticated = localStorage.getItem("authorized")
-    if (authenticated !== null) {
-      this.auth_token = authenticated
-      this.port = localStorage.getItem('port')
-      this.password = localStorage.getItem('password')
-      this.loading = false;
-      this.submit()
-    } else {
-      this.loading = false;
-    }
+
+    // requesting config map
+    ipc.send("config");
+
+    // recieving configmap
+    ipc.on('config_loaded', (_, {config}) => {
+      
+      this.config = config;
+      this.ready = true;
+      this.loading = true;
+
+      if (config.password !== null) {
+        this.submit();
+      } else {
+        this.loading = false;
+      }
+
+    });
+
   }
 }
 
